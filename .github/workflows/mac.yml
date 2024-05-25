@@ -1,0 +1,60 @@
+name: Build PlotJuggler on macOS
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        brew install cmake qt@5 protobuf mosquitto zeromq zstd
+        brew link qt@5 --override
+        echo 'QT_HOME=$(brew --prefix qt@5)
+        export CPPFLAGS="-I $QT_HOME/include"
+        export PKG_CONFIG_PATH="$QT_HOME/lib/pkgconfig"
+        export LDFLAGS="$QT_HOME/lib"' >> $GITHUB_ENV
+        source $GITHUB_ENV
+
+    - name: Set up environment variables
+      run: |
+        QT_HOME=$(brew --prefix qt@5)
+        echo "QT_HOME=$QT_HOME" >> $GITHUB_ENV
+        echo "CPPFLAGS=-I $QT_HOME/include" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=$QT_HOME/lib/pkgconfig" >> $GITHUB_ENV
+        echo "LDFLAGS=$QT_HOME/lib" >> $GITHUB_ENV
+        source $GITHUB_ENV
+
+    - name: Create build directory
+      run: mkdir -p ~/plotjuggler_ws/src
+
+    - name: Clone PlotJuggler
+      run: |
+        git clone https://github.com/facontidavide/PlotJuggler.git ~/plotjuggler_ws/src/PlotJuggler
+        cd ~/plotjuggler_ws
+
+    - name: Build PlotJuggler
+      run: |
+        cmake -S ~/plotjuggler_ws/src/PlotJuggler -B ~/plotjuggler_ws/build/PlotJuggler -DCMAKE_INSTALL_PREFIX=~/plotjuggler_ws/install
+        cmake --build ~/plotjuggler_ws/build/PlotJuggler --config RelWithDebInfo --target install
+
+    - name: Create binary package
+      run: |
+        brew install create-dmg
+        create-dmg ~/plotjuggler_ws/install/bin/PlotJuggler --overwrite --out ~/plotjuggler_ws/PlotJuggler.dmg
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: PlotJuggler-macos
+        path: ~/plotjuggler_ws/PlotJuggler.dmg
